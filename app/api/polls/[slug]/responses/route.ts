@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dateKey, getWeekends } from "@/lib/weekends";
@@ -17,10 +18,16 @@ export async function POST(
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const unavailable = Array.isArray(body.unavailable)
-      ? body.unavailable.filter((date): date is string => typeof date === "string")
+      ? body.unavailable.filter(
+          (date): date is string => typeof date === "string"
+        )
       : [];
 
-    if (!name || !Array.isArray(body.unavailable) || unavailable.length !== body.unavailable.length) {
+    if (
+      !name ||
+      !Array.isArray(body.unavailable) ||
+      unavailable.length !== body.unavailable.length
+    ) {
       return NextResponse.json(
         { error: "Datos inválidos." },
         { status: 400 }
@@ -41,6 +48,7 @@ export async function POST(
     const valid = new Set(
       getWeekends(poll.startDate, poll.endDate).map(dateKey)
     );
+
     const uniqueUnavailable = [...new Set(unavailable)];
 
     if (uniqueUnavailable.some((d: string) => !valid.has(d))) {
@@ -50,10 +58,13 @@ export async function POST(
       );
     }
 
+    const editToken = crypto.randomBytes(32).toString("hex");
+
     const response = await prisma.response.create({
       data: {
         pollId: poll.id,
         name,
+        editToken,
         unavailable: {
           create: uniqueUnavailable.map((d) => ({
             weekend: new Date(`${d}T12:00:00Z`),
@@ -106,14 +117,19 @@ export async function GET(
         const key = dateKey(date);
 
         const unavailableResponses = poll.responses.filter((response) =>
-          response.unavailable.some((item) => dateKey(item.weekend) === key)
+          response.unavailable.some(
+            (item) => dateKey(item.weekend) === key
+          )
         );
 
         return {
           weekend: key,
-          available: poll.responses.length - unavailableResponses.length,
+          available:
+            poll.responses.length - unavailableResponses.length,
           total: poll.responses.length,
-          unavailable: unavailableResponses.map((response) => response.name),
+          unavailable: unavailableResponses.map(
+            (response) => response.name
+          ),
         };
       })
       .sort((a, b) => b.available - a.available);
@@ -123,7 +139,9 @@ export async function GET(
       responses: poll.responses.map((response) => ({
         id: response.id,
         name: response.name,
-        unavailable: response.unavailable.map((item) => dateKey(item.weekend)),
+        unavailable: response.unavailable.map((item) =>
+          dateKey(item.weekend)
+        ),
       })),
     });
   } catch (error) {
