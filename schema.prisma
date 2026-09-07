@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Poll {
+  id         String     @id @default(cuid())
+  slug       String     @unique
+  title      String
+  startDate  DateTime
+  endDate    DateTime
+  responses  Response[]
+  createdAt  DateTime   @default(now())
+}
+
+model Response {
+  id          String        @id @default(cuid())
+  pollId      String
+  name        String
+  editToken   String        @unique
+  poll        Poll          @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  unavailable Unavailable[]
+  createdAt   DateTime      @default(now())
+}
+
+model Unavailable {
+  id         String   @id @default(cuid())
+  responseId String
+  weekend    DateTime
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, weekend])
+}
